@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta content="IE=edge" http-equiv="X-UA-Compatible">
+  <meta content="width=device-width,initial-scale=1" name="viewport">
+  <meta content="description" name="description">
+  <meta name="google" content="notranslate" />
+  <meta name="msapplication-tap-highlight" content="no">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-icon-180x180.png">
+  <link href="./assets/favicon.ico" rel="icon">
+
+  <title>Hand Landmark Detection</title>
+
+  <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+  <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+  <link href="./main.3f6952e4.css" rel="stylesheet">
+  <style>
+    /* Styling for containers and frames */
+    #webcam-container, #upload-container {
+      text-align: center;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .frame {
+      width: 400px;
+      height: 300px;
+      border: 2px solid #333;
+      display: inline-block;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    #webcam {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #upload-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    button {
+      margin-top: 10px;
+    }
+
+    /* Center the upload button */
+    #image-upload {
+      margin-top: 10px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+</head>
+
+<body class="">
+  <div id="site-border-left"></div>
+  <div id="site-border-right"></div>
+  <div id="site-border-top"></div>
+  <div id="site-border-bottom"></div>
+
+  <header>
+    <nav class="navbar  navbar-fixed-top navbar-default">
+      <div class="container">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse" aria-expanded="false">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbar-collapse">
+          <ul class="nav navbar-nav ">
+            <li><a href="./index.html" title="">Home</a></li>
+            <li><a href="./ImageClassification.html" title="">ImageClassification</a></li>
+            <li><a href="./ObjectDetection.html" title="">ObjectDetection</a></li>
+            <li><a href="./ImageSegmentation.html" title="">ImageSegmentation</a></li>
+            <li><a href="./HandLandmarkDetection.html" title="">HandLandmarkDetection</a></li>
+            <li><a href="./FaceDetection.html" title="">FaceDetection</a></li>
+            <li><a href="./aboutus.html" title="">About us</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <div class="section-container">
+    <div class="container center-container">
+      <div class="row">
+        <div class="col-sm-8 col-sm-offset-2 section-container-spacer">
+          <div class="text-center">
+            <h1 class="h2">Hand Landmark Detection</h1>
+            <p>
+              Hand Landmark Detection คือการตรวจจับและระบุตำแหน่งจุดสำคัญ (landmark) บนมือในภาพหรือวิดีโอ โดยใช้เทคนิคปัญญาประดิษฐ์และการประมวลผลภาพ จุดสำคัญเหล่านี้จะเป็นตำแหน่งบนมือที่เป็นจุดหลัก เช่น ปลายนิ้ว ข้อต่อ และฝ่ามือ ซึ่งมักใช้ในการประยุกต์งานต่าง ๆ เช่น การควบคุมท่าทาง (gesture control), การติดตามการเคลื่อนไหวของมือ, และการสื่อสารด้วยภาษามือ (sign language recognition)
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Webcam Section -->
+      <div id="webcam-container">
+        <div class="frame">
+          <video id="webcam" autoplay playsinline></video>
+          <canvas id="webcam-canvas"></canvas>
+        </div>
+        <button id="webcamButton">Enable Webcam</button>
+      </div>
+
+      <!-- Upload Section -->
+      <div id="upload-container">
+        <div class="frame">
+          <img id="upload-preview" alt="Upload Preview">
+          <canvas id="upload-canvas"></canvas>
+        </div>
+        <input type="file" id="image-upload" accept="image/*">
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      HandLandmarker,
+      FilesetResolver
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+
+    let handLandmarker;
+    let runningMode = "IMAGE";  // Default mode is IMAGE for uploads
+    let webcamRunning = false;
+
+    const video = document.getElementById('webcam');
+    const webcamCanvas = document.getElementById('webcam-canvas');
+    const webcamCtx = webcamCanvas.getContext('2d');
+
+    const uploadCanvas = document.getElementById('upload-canvas');
+    const uploadCtx = uploadCanvas.getContext('2d');
+    const uploadPreview = document.getElementById('upload-preview');
+
+    const createHandLandmarker = async () => {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+      );
+      handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+          delegate: "GPU"
+        },
+        runningMode: runningMode,
+        numHands: 2
+      });
+    };
+    createHandLandmarker();
+
+    /********************************************************************/
+    /* Real-time Webcam Hand Detection */
+    /********************************************************************/
+    const enableWebcamButton = document.getElementById('webcamButton');
+
+    enableWebcamButton.addEventListener('click', async () => {
+      if (!handLandmarker) {
+        console.log("Wait for handLandmarker to load");
+        return;
+      }
+
+      if (webcamRunning) {
+        webcamRunning = false;
+        enableWebcamButton.innerText = "Enable Webcam";
+        video.srcObject.getTracks().forEach(track => track.stop());
+      } else {
+        webcamRunning = true;
+        enableWebcamButton.innerText = "Disable Webcam";
+
+        // Start the webcam
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+
+        video.addEventListener('loadeddata', async () => {
+          runningMode = "VIDEO";
+          await handLandmarker.setOptions({ runningMode });
+          predictWebcam();
+        });
+      }
+    });
+
+    const predictWebcam = async () => {
+      webcamCanvas.width = video.videoWidth;
+      webcamCanvas.height = video.videoHeight;
+
+      const results = await handLandmarker.detectForVideo(video, performance.now());
+
+      webcamCtx.clearRect(0, 0, webcamCanvas.width, webcamCanvas.height);
+      if (results.landmarks) {
+        for (const landmarks of results.landmarks) {
+          drawLandmarks(webcamCtx, landmarks, { color: "#FF0000", lineWidth: 2 });
+        }
+      }
+      if (webcamRunning) {
+        requestAnimationFrame(predictWebcam);
+      }
+    };
+
+    /********************************************************************/
+    /* Image Upload Hand Detection */
+    /********************************************************************/
+    const imageUpload = document.getElementById('image-upload');
+
+    imageUpload.addEventListener('change', async (event) => {
+      if (!handLandmarker) {
+        console.log("Wait for handLandmarker to load");
+        return;
+      }
+
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const url = URL.createObjectURL(file);
+      uploadPreview.src = url;
+
+      uploadPreview.onload = async () => {
+        runningMode = "IMAGE";
+        await handLandmarker.setOptions({ runningMode });
+
+        uploadCanvas.width = uploadPreview.width;
+        uploadCanvas.height = uploadPreview.height;
+        const results = await handLandmarker.detect(uploadPreview);
+
+        uploadCtx.clearRect(0, 0, uploadCanvas.width, uploadCanvas.height);
+        if (results.landmarks) {
+          for (const landmarks of results.landmarks) {
+            drawLandmarks(uploadCtx, landmarks, { color: "#FF0000", lineWidth: 2 });
+          }
+        }
+      };
+    });
+  </script>
+
+<footer class="footer-container text-center">
+  <div class="container">
+    <div class="row">
+      <div class="col-xs-12">
+        <p>Website created by : Worawiwat Chaichuang , Rawinpat Boontanutsakul , Panupong Jantabootrah</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+</body>
+
+</html>

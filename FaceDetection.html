@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta content="IE=edge" http-equiv="X-UA-Compatible">
+  <meta content="width=device-width,initial-scale=1" name="viewport">
+  <meta content="description" name="description">
+  <meta name="google" content="notranslate" />
+  <meta name="msapplication-tap-highlight" content="no">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-icon-180x180.png">
+  <link href="./assets/favicon.ico" rel="icon">
+
+  <title>Face Detection</title>
+
+  <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+  <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+  <link href="./main.3f6952e4.css" rel="stylesheet">
+
+  <style>
+    /* Styling for containers and frames */
+    #webcam-container, #upload-container {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .frame {
+      width: 400px;
+      height: 300px;
+      border: 2px solid #333;
+      display: inline-block;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    #webcam {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #upload-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .center-container {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    button {
+      margin: 10px;
+    }
+
+    #image-upload {
+      margin-top: 10px;
+    }
+
+    .highlighter {
+      background: rgba(0, 255, 0, 0.25);
+      border: 1px dashed #fff;
+      z-index: 1;
+      position: absolute;
+    }
+
+    .info {
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 0.5px;
+      font-size: 10px;
+    }
+  </style>
+</head>
+
+<body class="">
+  <div id="site-border-left"></div>
+  <div id="site-border-right"></div>
+  <div id="site-border-top"></div>
+  <div id="site-border-bottom"></div>
+
+  <header>
+    <nav class="navbar  navbar-fixed-top navbar-default">
+      <div class="container">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse" aria-expanded="false">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbar-collapse">
+          <ul class="nav navbar-nav ">
+            <li><a href="./index.html" title="">Home</a></li>
+            <li><a href="./ImageClassification.html" title="">ImageClassification</a></li>
+            <li><a href="./ObjectDetection.html" title="">ObjectDetection</a></li>
+            <li><a href="./ImageSegmentation.html" title="">ImageSegmentation</a></li>
+            <li><a href="./HandLandmarkDetection.html" title="">HandLandmarkDetection</a></li>
+            <li><a href="./FaceDetection.html" title="">FaceDetection</a></li>
+            <li><a href="./aboutus.html" title="">About us</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <div class="section-container">
+            <div class="row">
+              <div class="col-sm-8 col-sm-offset-2 section-container-spacer">
+                <div class="text-center">
+                  <h1 class="h2">FaceDetection</h1>
+                  <p>
+                    Face Detection คือกระบวนการในการระบุและหาตำแหน่งใบหน้าของบุคคลในภาพถ่ายหรือวิดีโอโดยใช้เทคนิคการประมวลผลภาพและปัญญาประดิษฐ์ เป้าหมายของการตรวจจับใบหน้าคือการระบุบริเวณที่ใบหน้าปรากฏอยู่ในภาพ ไม่จำเป็นต้องบอกว่าเป็นใคร (ซึ่งเป็นหน้าที่ของ Face Recognition) แต่เพียงแค่บอกว่า "ที่จุดนี้คือใบหน้า"</div>
+    </div>
+  </div>
+
+  <div>
+      <div class="container center-container">
+      <!-- Webcam Container -->
+      <div id="webcam-container">
+        <h3>Face Detection</h3>
+        <div class="frame">
+          <video id="webcam" autoplay playsinline></video>
+        </div>
+        <p id="webcam-predictions">Prediction will appear here...</p>
+        <button id="webcamButton" class="mdc-button mdc-button--raised">ENABLE WEBCAM</button>
+        <button id="stopWebcamButton" class="mdc-button mdc-button--raised" style="display:none;">DISABLE WEBCAM</button>
+      </div>
+
+      <!-- Image Upload Container -->
+      <div id="upload-container">
+        <h3>Upload an Image for Face Detection</h3>
+        <div class="frame">
+          <img id="upload-preview" alt="Uploaded Image Preview">
+        </div>
+        <input type="file" id="image-upload" accept="image/*">
+        <p id="upload-predictions">Prediction will appear here...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      FaceDetector,
+      FilesetResolver
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2";
+
+    let faceDetector;
+    let runningMode = "IMAGE"; // Default mode is IMAGE for uploads
+    let webcamRunning = false;
+    let video = document.getElementById('webcam');
+    let webcamPredictions = document.getElementById('webcam-predictions');
+    let uploadPredictions = document.getElementById('upload-predictions');
+    let enableWebcamButton = document.getElementById('webcamButton');
+    let stopWebcamButton = document.getElementById('stopWebcamButton');
+
+    // Load the Face Detector model
+    async function createFaceDetector() {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm"
+      );
+      faceDetector = await FaceDetector.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`
+        },
+        scoreThreshold: 0.5,
+        runningMode: runningMode
+      });
+    }
+
+    // Detect faces in uploaded images
+    document.getElementById('image-upload').addEventListener('change', async (event) => {
+      const image = document.getElementById('upload-preview');
+      image.src = URL.createObjectURL(event.target.files[0]);
+
+      image.onload = async () => {
+        if (runningMode !== "IMAGE") {
+          runningMode = "IMAGE";
+          await faceDetector.setOptions({ runningMode: "IMAGE" });
+        }
+
+        const detections = await faceDetector.detect(image);
+        clearDetections();
+        displayDetections(detections, image);
+      };
+    });
+
+    // Detect faces in webcam stream
+    async function enableCam() {
+      if (!faceDetector) {
+        console.log("Wait! faceDetector not loaded yet.");
+        return;
+      }
+
+      enableWebcamButton.style.display = "none";
+      stopWebcamButton.style.display = "inline";
+      webcamRunning = true;
+
+      const constraints = {
+        video: true
+      };
+
+      navigator.mediaDevices
+        .getUserMedia(constraints)
+        .then(function (stream) {
+          video.srcObject = stream;
+          video.addEventListener("loadeddata", predictWebcam);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    }
+
+    async function disableCam() {
+      webcamRunning = false;
+      video.srcObject.getTracks().forEach(track => track.stop());
+      enableWebcamButton.style.display = "inline";
+      stopWebcamButton.style.display = "none";
+      clearDetections(); // Clear previous detections when webcam is stopped
+    }
+
+    let lastVideoTime = -1;
+    async function predictWebcam() {
+      if (runningMode === "IMAGE") {
+        runningMode = "VIDEO";
+        await faceDetector.setOptions({ runningMode: "VIDEO" });
+      }
+      let startTimeMs = performance.now();
+
+      if (video.currentTime !== lastVideoTime) {
+        lastVideoTime = video.currentTime;
+        const detections = await faceDetector.detectForVideo(video, startTimeMs);
+        clearDetections();
+        displayDetections(detections, video);
+      }
+
+      if (webcamRunning) {
+        window.requestAnimationFrame(predictWebcam);
+      }
+    }
+
+    function clearDetections() {
+      const highlighters = document.querySelectorAll(".highlighter");
+      const infos = document.querySelectorAll(".info");
+
+      highlighters.forEach(element => {
+        element.remove();
+      });
+
+      infos.forEach(element => {
+        element.remove();
+      });
+    }
+
+    function displayDetections(result, resultElement) {
+      let scaleX, scaleY;
+
+      // ตรวจสอบว่า element คือ VIDEO หรือ IMAGE เพื่อปรับการคำนวณสเกล
+      if (resultElement.tagName === 'VIDEO') {
+        scaleX = resultElement.videoWidth / resultElement.offsetWidth;
+        scaleY = resultElement.videoHeight / resultElement.offsetHeight;
+      } else {
+        scaleX = resultElement.naturalWidth / resultElement.offsetWidth;
+        scaleY = resultElement.naturalHeight / resultElement.offsetHeight;
+      }
+
+      for (let detection of result.detections) {
+        const p = document.createElement("p");
+        p.setAttribute("class", "info");
+        p.innerText =
+          "Face - with " +
+          Math.round(parseFloat(detection.categories[0].score) * 100) +
+          "% confidence.";
+
+        // คำนวณตำแหน่งและขนาดกรอบการตรวจจับ
+        const originX = detection.boundingBox.originX / scaleX;
+        const originY = detection.boundingBox.originY / scaleY;
+        const width = detection.boundingBox.width / scaleX;
+        const height = detection.boundingBox.height / scaleY;
+
+        p.style = `
+          left: ${originX}px;
+          top: ${originY}px;
+          width: ${width - 10}px;
+        `;
+
+        const highlighter = document.createElement("div");
+        highlighter.setAttribute("class", "highlighter");
+        highlighter.style = `
+          left: ${originX}px;
+          top: ${originY}px;
+          width: ${width}px;
+          height: ${height}px;
+        `;
+
+        resultElement.parentNode.appendChild(highlighter);
+        resultElement.parentNode.appendChild(p);
+      }
+    }
+
+    enableWebcamButton.addEventListener('click', enableCam);
+    stopWebcamButton.addEventListener('click', disableCam);
+
+    createFaceDetector();
+  </script>
+
+
+
+  <footer class="footer-container text-center">
+    <div class="container">
+      <div class="row">
+        <div class="col-xs-12">
+          <p>Website created by : Worawiwat Chaichuang , Rawinpat Boontanutsakul , Panupong Jantabootrah</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script type="text/javascript" src="./main.70a66962.js"></script>
+</body>
+
+</html>
